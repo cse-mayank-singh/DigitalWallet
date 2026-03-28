@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Razorpay Test Checkout</title>
+</head>
+<body style="padding: 50px; font-family: sans-serif;">
+
+<h2>Test Razorpay Payment</h2>
+<button id="rzp-button1" style="padding: 10px 20px; font-size: 16px; cursor: pointer;">
+    Pay Now
+</button>
+
+<!-- ✅ Result Section -->
+<div id="result" style="margin-top:30px; display:none;">
+    <h3>Payment Success Details</h3>
+
+    <p><b>Payment ID:</b></p>
+    <input id="paymentId" style="width:400px;" readonly />
+
+    <p><b>Order ID:</b></p>
+    <input id="orderId" style="width:400px;" readonly />
+
+    <p><b>Signature:</b></p>
+    <input id="signature" style="width:400px;" readonly />
+
+    <br><br>
+    <button onclick="copyAll()">Copy All</button>
+</div>
+
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+
+<script>
+    var options = {
+        "key": "rzp_test_SUZOuIv4WCfba7",
+        "amount": "59900",
+        "currency": "INR",
+        "name": "Loyalty Service",
+        "description": "Test Wallet Top Up",
+        "order_id": "order_SVo4p6P7bd6m8j",
+
+        "handler": function (response){
+            console.log("PAYMENT SUCCESSFUL!");
+
+            // ✅ Show data in input fields
+            document.getElementById("result").style.display = "block";
+
+            document.getElementById("paymentId").value = response.razorpay_payment_id;
+            document.getElementById("orderId").value = response.razorpay_order_id;
+            document.getElementById("signature").value = response.razorpay_signature;
+        },
+
+        "theme": {
+            "color": "#3399cc"
+        }
+    };
+
+    var rzp1 = new Razorpay(options);
+
+    rzp1.on('payment.failed', function (response){
+         alert("Payment Failed! Reason: " + response.error.description);
+    });
+
+    document.getElementById('rzp-button1').onclick = function(e){
+        rzp1.open();
+        e.preventDefault();
+    };
+
+    // ✅ Copy function
+    function copyAll() {
+        const text =
+            "Payment ID: " + document.getElementById("paymentId").value + "\n" +
+            "Order ID: " + document.getElementById("orderId").value + "\n" +
+            "Signature: " + document.getElementById("signature").value;
+
+        navigator.clipboard.writeText(text);
+        alert("Copied to clipboard!");
+    }
+</script>
+
+</body>
+</html>
