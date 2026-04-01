@@ -12,6 +12,8 @@ import com.loyaltyService.reward_service.repository.RedemptionRepository;
 import com.loyaltyService.reward_service.repository.RewardItemRepository;
 import com.loyaltyService.reward_service.repository.RewardRepository;
 import com.loyaltyService.reward_service.repository.RewardTransactionRepository;
+import com.loyaltyService.reward_service.service.impl.RewardCommandServiceImpl;
+import com.loyaltyService.reward_service.service.impl.RewardQueryServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -48,16 +50,21 @@ class RewardServiceTest {
     @Mock private KafkaProducerService kafkaProducer;
 
     @InjectMocks
-    private RewardService rewardService;
+    private RewardCommandServiceImpl rewardCommandService;
+
+    @InjectMocks
+    private RewardQueryServiceImpl rewardQueryService;
 
     @BeforeEach
     void setUp() {
-        ReflectionTestUtils.setField(rewardService, "pointsPerRupee", 100);
-        ReflectionTestUtils.setField(rewardService, "minRedeemPoints", 100);
-        ReflectionTestUtils.setField(rewardService, "maxDailyRedeemPoints", 5000);
-        ReflectionTestUtils.setField(rewardService, "goldThreshold", 1000);
-        ReflectionTestUtils.setField(rewardService, "platinumThreshold", 5000);
-        ReflectionTestUtils.setField(rewardService, "firstTopupBonus", 100);
+        ReflectionTestUtils.setField(rewardCommandService, "pointsPerRupee", 100);
+        ReflectionTestUtils.setField(rewardCommandService, "minRedeemPoints", 100);
+        ReflectionTestUtils.setField(rewardCommandService, "maxDailyRedeemPoints", 5000);
+        ReflectionTestUtils.setField(rewardCommandService, "goldThreshold", 1000);
+        ReflectionTestUtils.setField(rewardCommandService, "platinumThreshold", 5000);
+        ReflectionTestUtils.setField(rewardCommandService, "firstTopupBonus", 100);
+        ReflectionTestUtils.setField(rewardQueryService, "goldThreshold", 1000);
+        ReflectionTestUtils.setField(rewardQueryService, "platinumThreshold", 5000);
     }
 
     @Test
@@ -66,7 +73,7 @@ class RewardServiceTest {
         when(rewardRepo.findByUserId(1L)).thenReturn(Optional.empty());
         when(rewardRepo.save(any(RewardAccount.class))).thenReturn(created);
 
-        rewardService.earnPoints(1L, new BigDecimal("1000"));
+        rewardCommandService.earnPoints(1L, new BigDecimal("1000"));
 
         verify(txnRepo, times(2)).save(any(RewardTransaction.class));
         verify(kafkaProducer).send(eq("reward-events"), any(Map.class));
@@ -78,7 +85,7 @@ class RewardServiceTest {
         RewardAccount account = RewardAccount.builder().userId(1L).points(0).tier(RewardAccount.Tier.SILVER).firstTopupDone(false).build();
         when(rewardRepo.findByUserId(1L)).thenReturn(Optional.of(account));
 
-        rewardService.earnPoints(1L, new BigDecimal("50"));
+        rewardCommandService.earnPoints(1L, new BigDecimal("50"));
 
         ArgumentCaptor<RewardTransaction> captor = ArgumentCaptor.forClass(RewardTransaction.class);
         verify(txnRepo).save(captor.capture());
@@ -91,9 +98,27 @@ class RewardServiceTest {
         RewardAccount account = RewardAccount.builder().userId(1L).points(950).tier(RewardAccount.Tier.SILVER).firstTopupDone(true).build();
         when(rewardRepo.findByUserId(1L)).thenReturn(Optional.of(account));
 
-        rewardService.earnPoints(1L, new BigDecimal("10000"));
+        rewardCommandService.earnPoints(1L, new BigDecimal("10000"));
 
         assertEquals(RewardAccount.Tier.GOLD, account.getTier());
+    }
+
+    @Test
+    void earnPointsInitializesLegacyNullFieldsBeforeApplyingRewards() {
+        RewardAccount legacyAccount = RewardAccount.builder()
+                .userId(1L)
+                .points(null)
+                .tier(null)
+                .firstTopupDone(null)
+                .build();
+        when(rewardRepo.findByUserId(1L)).thenReturn(Optional.of(legacyAccount));
+
+        rewardCommandService.earnPoints(1L, new BigDecimal("500"));
+
+        assertEquals(105, legacyAccount.getPoints());
+        assertEquals(RewardAccount.Tier.SILVER, legacyAccount.getTier());
+        assertEquals(Boolean.TRUE, legacyAccount.getFirstTopupDone());
+        verify(txnRepo, times(2)).save(any(RewardTransaction.class));
     }
 
     @Test
@@ -109,7 +134,7 @@ class RewardServiceTest {
         );
         when(itemRepo.save(any(RewardItem.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        RewardItem item = rewardService.addCatalogItem(request);
+        RewardItem item = rewardCommandService.addCatalogItem(request);
 
         assertEquals("Coupon", item.getName());
         assertEquals(RewardItem.ItemType.COUPON, item.getType());
@@ -118,7 +143,7 @@ class RewardServiceTest {
 
     @Test
     void redeemPointsThrowsWhenBelowMinimum() {
-        RewardException exception = assertThrows(RewardException.class, () -> rewardService.redeemPoints(1L, 50));
+        RewardException exception = assertThrows(RewardException.class, () -> rewardCommandService.redeemPoints(1L, 50));
 
         assertEquals(HttpStatus.BAD_REQUEST, exception.getStatus());
     }
@@ -127,7 +152,7 @@ class RewardServiceTest {
     void redeemPointsThrowsWhenDailyLimitExceeded() {
         when(txnRepo.sumRedeemedPointsToday(eq(1L), eq(RewardTransaction.TxnType.REDEEM), any(), any())).thenReturn(4900);
 
-        RewardException exception = assertThrows(RewardException.class, () -> rewardService.redeemPoints(1L, 200));
+        RewardException exception = assertThrows(RewardException.class, () -> rewardCommandService.redeemPoints(1L, 200));
 
         assertEquals(HttpStatus.BAD_REQUEST, exception.getStatus());
     }
@@ -137,7 +162,7 @@ class RewardServiceTest {
         when(txnRepo.sumRedeemedPointsToday(eq(1L), eq(RewardTransaction.TxnType.REDEEM), any(), any())).thenReturn(0);
         when(rewardRepo.findByUserId(1L)).thenReturn(Optional.empty());
 
-        RewardException exception = assertThrows(RewardException.class, () -> rewardService.redeemPoints(1L, 200));
+        RewardException exception = assertThrows(RewardException.class, () -> rewardCommandService.redeemPoints(1L, 200));
 
         assertEquals(HttpStatus.NOT_FOUND, exception.getStatus());
     }
@@ -148,7 +173,7 @@ class RewardServiceTest {
         when(txnRepo.sumRedeemedPointsToday(eq(1L), eq(RewardTransaction.TxnType.REDEEM), any(), any())).thenReturn(0);
         when(rewardRepo.findByUserId(1L)).thenReturn(Optional.of(account));
 
-        RewardException exception = assertThrows(RewardException.class, () -> rewardService.redeemPoints(1L, 200));
+        RewardException exception = assertThrows(RewardException.class, () -> rewardCommandService.redeemPoints(1L, 200));
 
         assertEquals(HttpStatus.BAD_REQUEST, exception.getStatus());
     }
@@ -160,7 +185,7 @@ class RewardServiceTest {
         when(rewardRepo.findByUserId(1L)).thenReturn(Optional.of(account));
         when(walletClient.credit(1L, new BigDecimal("2"))).thenReturn(ResponseEntity.ok().build());
 
-        rewardService.redeemPoints(1L, 200);
+        rewardCommandService.redeemPoints(1L, 200);
 
         assertEquals(300, account.getPoints());
         verify(walletClient).credit(1L, new BigDecimal("2"));
@@ -174,7 +199,7 @@ class RewardServiceTest {
         when(rewardRepo.findByUserId(1L)).thenReturn(Optional.of(account));
         when(walletClient.credit(1L, new BigDecimal("2"))).thenReturn(ResponseEntity.ok().build());
 
-        rewardService.convertPointsToCash(1L, 200);
+        rewardCommandService.convertPointsToCash(1L, 200);
 
         verify(walletClient).credit(1L, new BigDecimal("2"));
     }
@@ -185,7 +210,7 @@ class RewardServiceTest {
         when(rewardRepo.findByUserId(1L)).thenReturn(Optional.of(account));
         when(itemRepo.findById(1L)).thenReturn(Optional.empty());
 
-        RewardException exception = assertThrows(RewardException.class, () -> rewardService.redeemReward(1L, 1L));
+        RewardException exception = assertThrows(RewardException.class, () -> rewardCommandService.redeemReward(1L, 1L));
 
         assertEquals(HttpStatus.NOT_FOUND, exception.getStatus());
     }
@@ -197,7 +222,7 @@ class RewardServiceTest {
         when(rewardRepo.findByUserId(1L)).thenReturn(Optional.of(account));
         when(itemRepo.findById(1L)).thenReturn(Optional.of(item));
 
-        assertThrows(RewardException.class, () -> rewardService.redeemReward(1L, 1L));
+        assertThrows(RewardException.class, () -> rewardCommandService.redeemReward(1L, 1L));
     }
 
     @Test
@@ -207,7 +232,7 @@ class RewardServiceTest {
         when(rewardRepo.findByUserId(1L)).thenReturn(Optional.of(account));
         when(itemRepo.findById(1L)).thenReturn(Optional.of(item));
 
-        assertThrows(RewardException.class, () -> rewardService.redeemReward(1L, 1L));
+        assertThrows(RewardException.class, () -> rewardCommandService.redeemReward(1L, 1L));
     }
 
     @Test
@@ -217,7 +242,7 @@ class RewardServiceTest {
         when(rewardRepo.findByUserId(1L)).thenReturn(Optional.of(account));
         when(itemRepo.findById(1L)).thenReturn(Optional.of(item));
 
-        assertThrows(RewardException.class, () -> rewardService.redeemReward(1L, 1L));
+        assertThrows(RewardException.class, () -> rewardCommandService.redeemReward(1L, 1L));
     }
 
     @Test
@@ -227,7 +252,7 @@ class RewardServiceTest {
         when(rewardRepo.findByUserId(1L)).thenReturn(Optional.of(account));
         when(itemRepo.findById(1L)).thenReturn(Optional.of(item));
 
-        assertThrows(RewardException.class, () -> rewardService.redeemReward(1L, 1L));
+        assertThrows(RewardException.class, () -> rewardCommandService.redeemReward(1L, 1L));
     }
 
     @Test
@@ -238,7 +263,7 @@ class RewardServiceTest {
         when(itemRepo.findById(1L)).thenReturn(Optional.of(item));
         when(txnRepo.sumRedeemedPointsToday(eq(1L), eq(RewardTransaction.TxnType.REDEEM), any(), any())).thenReturn(4900);
 
-        assertThrows(RewardException.class, () -> rewardService.redeemReward(1L, 1L));
+        assertThrows(RewardException.class, () -> rewardCommandService.redeemReward(1L, 1L));
     }
 
     @Test
@@ -251,7 +276,7 @@ class RewardServiceTest {
         when(txnRepo.sumRedeemedPointsToday(eq(1L), eq(RewardTransaction.TxnType.REDEEM), any(), any())).thenReturn(0);
         when(redemptionRepo.save(any(Redemption.class))).thenReturn(saved);
 
-        Redemption redemption = rewardService.redeemReward(1L, 1L);
+        Redemption redemption = rewardCommandService.redeemReward(1L, 1L);
 
         assertEquals(800, account.getPoints());
         assertEquals(1, item.getStock());
@@ -269,7 +294,7 @@ class RewardServiceTest {
         when(walletClient.credit(1L, new BigDecimal("25"))).thenReturn(ResponseEntity.ok().build());
         when(redemptionRepo.save(any(Redemption.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        rewardService.redeemReward(1L, 1L);
+        rewardCommandService.redeemReward(1L, 1L);
 
         verify(walletClient).credit(1L, new BigDecimal("25"));
     }
@@ -279,7 +304,7 @@ class RewardServiceTest {
         RewardAccount account = RewardAccount.builder().userId(1L).points(800).tier(RewardAccount.Tier.SILVER).build();
         when(rewardRepo.findByUserId(1L)).thenReturn(Optional.of(account));
 
-        RewardSummaryDto summary = rewardService.getSummary(1L);
+        RewardSummaryDto summary = rewardQueryService.getSummary(1L);
 
         assertEquals("GOLD", summary.getNextTier());
         assertEquals(200, summary.getPointsToNextTier());
@@ -289,21 +314,21 @@ class RewardServiceTest {
     void getCatalogDelegatesToRepository() {
         when(itemRepo.findByActiveTrueOrderByPointsRequiredAsc()).thenReturn(List.of(RewardItem.builder().id(1L).build()));
 
-        assertEquals(1, rewardService.getCatalog().size());
+        assertEquals(1, rewardQueryService.getCatalog().size());
     }
 
     @Test
     void getTransactionsDelegatesToRepository() {
         when(txnRepo.findByUserIdOrderByCreatedAtDesc(1L)).thenReturn(List.of(RewardTransaction.builder().id(1L).build()));
 
-        assertEquals(1, rewardService.getTransactions(1L).size());
+        assertEquals(1, rewardQueryService.getTransactions(1L).size());
     }
 
     @Test
     void createAccountIfNotExistsCreatesWhenMissing() {
         when(rewardRepo.findByUserId(1L)).thenReturn(Optional.empty());
 
-        rewardService.createAccountIfNotExists(1L);
+        rewardCommandService.createAccountIfNotExists(1L);
 
         verify(rewardRepo).save(any(RewardAccount.class));
     }
@@ -312,7 +337,7 @@ class RewardServiceTest {
     void createAccountIfNotExistsSkipsWhenPresent() {
         when(rewardRepo.findByUserId(1L)).thenReturn(Optional.of(RewardAccount.builder().userId(1L).build()));
 
-        rewardService.createAccountIfNotExists(1L);
+        rewardCommandService.createAccountIfNotExists(1L);
 
         verify(rewardRepo, never()).save(any(RewardAccount.class));
     }
