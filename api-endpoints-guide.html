@@ -1,0 +1,657 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Digital Wallet API Guide</title>
+  <style>
+    :root {
+      --bg: #f7f2ea;
+      --panel: #fffdf8;
+      --panel-2: #f2e7d8;
+      --text: #241b16;
+      --muted: #665a52;
+      --line: #dbcbb8;
+      --accent: #b04a2f;
+      --accent-2: #295f5a;
+      --code: #1f2937;
+      --ok: #1f7a4c;
+      --warn: #a15c00;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Georgia, "Times New Roman", serif;
+      background:
+        radial-gradient(circle at top right, rgba(176, 74, 47, 0.09), transparent 32%),
+        linear-gradient(180deg, #fbf7f0 0%, var(--bg) 100%);
+      color: var(--text);
+      line-height: 1.55;
+    }
+
+    .wrap {
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 32px 20px 80px;
+    }
+
+    .hero {
+      background: linear-gradient(135deg, rgba(176, 74, 47, 0.12), rgba(41, 95, 90, 0.1));
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      padding: 28px;
+      box-shadow: 0 16px 50px rgba(36, 27, 22, 0.08);
+    }
+
+    h1, h2, h3 {
+      margin: 0 0 12px;
+      line-height: 1.15;
+    }
+
+    h1 {
+      font-size: clamp(2rem, 4vw, 3.4rem);
+      letter-spacing: -0.03em;
+    }
+
+    h2 {
+      font-size: 1.6rem;
+      margin-top: 34px;
+    }
+
+    h3 {
+      font-size: 1.15rem;
+    }
+
+    p {
+      margin: 0 0 12px;
+      color: var(--muted);
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 16px;
+      margin-top: 18px;
+    }
+
+    .panel, .endpoint {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 18px;
+      box-shadow: 0 10px 30px rgba(36, 27, 22, 0.05);
+    }
+
+    .eyebrow {
+      display: inline-block;
+      margin-bottom: 8px;
+      padding: 4px 10px;
+      border-radius: 999px;
+      background: rgba(41, 95, 90, 0.1);
+      color: var(--accent-2);
+      font-size: 0.84rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .section {
+      margin-top: 32px;
+    }
+
+    .endpoint-list {
+      display: grid;
+      gap: 14px;
+    }
+
+    .method {
+      display: inline-block;
+      min-width: 58px;
+      padding: 5px 10px;
+      border-radius: 999px;
+      color: #fff;
+      font-size: 0.8rem;
+      font-weight: 700;
+      text-align: center;
+      margin-right: 8px;
+    }
+
+    .get { background: #1f7a4c; }
+    .post { background: #b04a2f; }
+    .put { background: #225ea8; }
+    .patch { background: #7b4db8; }
+
+    .path {
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 0.96rem;
+      word-break: break-word;
+    }
+
+    pre {
+      margin: 10px 0 0;
+      padding: 14px;
+      border-radius: 14px;
+      background: var(--code);
+      color: #f9fafb;
+      overflow-x: auto;
+      font-size: 0.88rem;
+      line-height: 1.45;
+    }
+
+    code {
+      font-family: Consolas, "Courier New", monospace;
+    }
+
+    ul {
+      margin: 8px 0 0 18px;
+      color: var(--muted);
+    }
+
+    li + li {
+      margin-top: 6px;
+    }
+
+    .note {
+      border-left: 4px solid var(--accent);
+      padding: 10px 12px;
+      background: rgba(176, 74, 47, 0.08);
+      border-radius: 10px;
+      color: var(--text);
+    }
+
+    .ok {
+      color: var(--ok);
+      font-weight: 700;
+    }
+
+    .warn {
+      color: var(--warn);
+      font-weight: 700;
+    }
+
+    .table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 10px;
+      font-size: 0.95rem;
+      background: var(--panel);
+      border-radius: 14px;
+      overflow: hidden;
+    }
+
+    .table th,
+    .table td {
+      text-align: left;
+      padding: 12px;
+      border-bottom: 1px solid var(--line);
+      vertical-align: top;
+    }
+
+    .table th {
+      background: var(--panel-2);
+      color: var(--text);
+    }
+
+    .muted {
+      color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="hero">
+      <div class="eyebrow">Digital Wallet Backend</div>
+      <h1>Endpoint Guide and Test Recipes</h1>
+      <p>This page lists the public API routes exposed through the API gateway and the internal service-to-service routes used by the microservices. All examples are aligned with the controller signatures currently in the codebase.</p>
+      <div class="grid">
+        <div class="panel">
+          <h3>Recommended Base URL</h3>
+          <p>Use the API gateway first unless you are debugging a single service.</p>
+          <pre><code>Gateway: http://localhost:8080</code></pre>
+        </div>
+        <div class="panel">
+          <h3>Direct Service Ports</h3>
+          <pre><code>auth-service   : http://localhost:8084
+user-service   : http://localhost:8082
+wallet-service : http://localhost:8083
+rewards-service: http://localhost:8085
+eureka-server  : http://localhost:8761</code></pre>
+        </div>
+        <div class="panel">
+          <h3>Auth Model</h3>
+          <p>Protected routes go through gateway JWT filtering. After login, keep the bearer token and the returned user id and role.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>How To Test Quickly</h2>
+      <div class="grid">
+        <div class="panel">
+          <h3>1. Bootstrap admin</h3>
+          <p>The auth service now seeds an admin on first run if no admin exists.</p>
+          <pre><code>Email   : admin@digitalwallet.local
+Phone   : 9999999999
+Password: Admin@123</code></pre>
+        </div>
+        <div class="panel">
+          <h3>2. Get a token</h3>
+          <p>Login and copy the returned <code>accessToken</code>.</p>
+          <pre><code>POST http://localhost:8080/api/auth/login</code></pre>
+        </div>
+        <div class="panel">
+          <h3>3. Call secured routes</h3>
+          <pre><code>Authorization: Bearer &lt;accessToken&gt;</code></pre>
+          <p class="muted">Gateway injects downstream headers like <code>X-User-Id</code> and <code>X-User-Role</code>.</p>
+        </div>
+      </div>
+      <div class="note">
+        Public routes: all <code>/api/auth/**</code> endpoints.
+        Protected routes through gateway: <code>/api/users/**</code>, <code>/api/kyc/**</code>, <code>/api/admin/**</code>, <code>/api/wallet/**</code>, <code>/api/payment/**</code>, <code>/api/rewards/**</code>.
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Common Test Snippets</h2>
+      <pre><code># Signup a normal user
+curl -X POST http://localhost:8080/api/auth/signup ^
+  -H "Content-Type: application/json" ^
+  -d "{\"fullName\":\"Amit Kumar\",\"email\":\"amit@example.com\",\"phone\":\"9876543211\",\"password\":\"Password@1\"}"
+
+# Login as admin
+curl -X POST http://localhost:8080/api/auth/login ^
+  -H "Content-Type: application/json" ^
+  -d "{\"email\":\"admin@digitalwallet.local\",\"password\":\"Admin@123\"}"
+
+# Protected request pattern
+curl http://localhost:8080/api/users/profile ^
+  -H "Authorization: Bearer &lt;ACCESS_TOKEN&gt;"</code></pre>
+    </section>
+
+    <section class="section">
+      <h2>Authentication Endpoints</h2>
+      <div class="endpoint-list">
+        <div class="endpoint">
+          <h3><span class="method post">POST</span><span class="path">/api/auth/signup</span></h3>
+          <p>Create a normal user account.</p>
+          <pre><code>{
+  "fullName": "Amit Kumar",
+  "email": "amit@example.com",
+  "phone": "9876543211",
+  "password": "Password@1"
+}</code></pre>
+        </div>
+        <div class="endpoint">
+          <h3><span class="method post">POST</span><span class="path">/api/auth/login</span></h3>
+          <p>Email/password login. Returns access token, refresh token, user id and role.</p>
+          <pre><code>{
+  "email": "admin@digitalwallet.local",
+  "password": "Admin@123"
+}</code></pre>
+        </div>
+        <div class="endpoint">
+          <h3><span class="method post">POST</span><span class="path">/api/auth/login/phone</span></h3>
+          <p>Phone/password login.</p>
+          <pre><code>{
+  "phone": "9999999999",
+  "password": "Admin@123"
+}</code></pre>
+        </div>
+        <div class="endpoint">
+          <h3><span class="method post">POST</span><span class="path">/api/auth/send-otp</span></h3>
+          <p>Send login OTP to email.</p>
+          <pre><code>{
+  "email": "amit@example.com"
+}</code></pre>
+        </div>
+        <div class="endpoint">
+          <h3><span class="method post">POST</span><span class="path">/api/auth/verify-otp</span></h3>
+          <p>Verify login OTP and receive tokens.</p>
+          <pre><code>{
+  "email": "amit@example.com",
+  "otp": "123456"
+}</code></pre>
+        </div>
+        <div class="endpoint">
+          <h3><span class="method post">POST</span><span class="path">/api/auth/forgot-password/send-otp</span></h3>
+          <p>Start password reset flow.</p>
+          <pre><code>{
+  "email": "amit@example.com"
+}</code></pre>
+        </div>
+        <div class="endpoint">
+          <h3><span class="method post">POST</span><span class="path">/api/auth/forgot-password/verify-otp</span></h3>
+          <p>Verifies OTP and returns a temporary <code>resetToken</code>.</p>
+          <pre><code>{
+  "email": "amit@example.com",
+  "otp": "123456"
+}</code></pre>
+        </div>
+        <div class="endpoint">
+          <h3><span class="method post">POST</span><span class="path">/api/auth/reset-password</span></h3>
+          <p>Use the token from the previous step.</p>
+          <pre><code>{
+  "resetToken": "paste-reset-token-here",
+  "newPassword": "NewPassword@1"
+}</code></pre>
+        </div>
+        <div class="endpoint">
+          <h3><span class="method post">POST</span><span class="path">/api/auth/refresh</span></h3>
+          <pre><code>{
+  "refreshToken": "paste-refresh-token-here"
+}</code></pre>
+        </div>
+        <div class="endpoint">
+          <h3><span class="method post">POST</span><span class="path">/api/auth/logout</span></h3>
+          <pre><code>{
+  "refreshToken": "paste-refresh-token-here"
+}</code></pre>
+        </div>
+        <div class="endpoint">
+          <h3><span class="method get">GET</span><span class="path">/api/auth/health</span></h3>
+          <p>Simple health check.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>User and KYC Endpoints</h2>
+      <div class="endpoint-list">
+        <div class="endpoint">
+          <h3><span class="method get">GET</span><span class="path">/api/users/profile</span></h3>
+          <p>Get current user profile.</p>
+          <pre><code>curl http://localhost:8080/api/users/profile ^
+  -H "Authorization: Bearer &lt;ACCESS_TOKEN&gt;"</code></pre>
+        </div>
+        <div class="endpoint">
+          <h3><span class="method put">PUT</span><span class="path">/api/users/profile</span></h3>
+          <p>Update name and/or phone.</p>
+          <pre><code>{
+  "name": "Amit Kumar Updated",
+  "phone": "9876543212"
+}</code></pre>
+        </div>
+        <div class="endpoint">
+          <h3><span class="method post">POST</span><span class="path">/api/kyc/submit</span></h3>
+          <p>Multipart form-data endpoint. Use <code>docType</code>, <code>docNumber</code>, optional <code>docFile</code>.</p>
+          <pre><code>curl -X POST "http://localhost:8080/api/kyc/submit" ^
+  -H "Authorization: Bearer &lt;ACCESS_TOKEN&gt;" ^
+  -F "docType=AADHAR" ^
+  -F "docNumber=123412341234" ^
+  -F "docFile=@C:\path\to\document.jpg"</code></pre>
+        </div>
+        <div class="endpoint">
+          <h3><span class="method get">GET</span><span class="path">/api/kyc/status</span></h3>
+          <p>Fetch current user KYC status.</p>
+        </div>
+      </div>
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Admin Route</th>
+            <th>Method</th>
+            <th>How To Test</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>/api/admin/dashboard</code></td>
+            <td>GET</td>
+            <td>Login as admin and call through gateway with bearer token.</td>
+          </tr>
+          <tr>
+            <td><code>/api/admin/users?page=0&amp;size=20&amp;sortBy=createdAt&amp;sortDir=desc</code></td>
+            <td>GET</td>
+            <td>Optional filters: <code>status</code>, <code>userRole</code>.</td>
+          </tr>
+          <tr>
+            <td><code>/api/admin/users/{userId}</code></td>
+            <td>GET</td>
+            <td>Example: <code>/api/admin/users/1</code></td>
+          </tr>
+          <tr>
+            <td><code>/api/admin/users/search?q=amit</code></td>
+            <td>GET</td>
+            <td>Search by keyword across name, email or phone.</td>
+          </tr>
+          <tr>
+            <td><code>/api/admin/users/search/email?email=amit@example.com</code></td>
+            <td>GET</td>
+            <td>Exact email lookup.</td>
+          </tr>
+          <tr>
+            <td><code>/api/admin/users/search/phone?phone=9876543211</code></td>
+            <td>GET</td>
+            <td>Exact phone lookup.</td>
+          </tr>
+          <tr>
+            <td><code>/api/admin/users/search/date-range?from=2026-03-01&amp;to=2026-03-30</code></td>
+            <td>GET</td>
+            <td>Optional pagination supported.</td>
+          </tr>
+          <tr>
+            <td><code>/api/admin/users/search/kyc-status?kycStatus=PENDING</code></td>
+            <td>GET</td>
+            <td>Example values depend on the user-service KYC status enum.</td>
+          </tr>
+          <tr>
+            <td><code>/api/admin/users/{userId}/block</code></td>
+            <td>PATCH</td>
+            <td>No body.</td>
+          </tr>
+          <tr>
+            <td><code>/api/admin/users/{userId}/unblock</code></td>
+            <td>PATCH</td>
+            <td>No body.</td>
+          </tr>
+          <tr>
+            <td><code>/api/admin/users/{userId}/role?newRole=MERCHANT</code></td>
+            <td>PATCH</td>
+            <td>Use valid role values from user-service.</td>
+          </tr>
+          <tr>
+            <td><code>/api/admin/kyc/pending?page=0&amp;size=20</code></td>
+            <td>GET</td>
+            <td>Admin only.</td>
+          </tr>
+          <tr>
+            <td><code>/api/admin/kyc/{kycId}/approve</code></td>
+            <td>POST</td>
+            <td>No body.</td>
+          </tr>
+          <tr>
+            <td><code>/api/admin/kyc/user/{userId}/approve</code></td>
+            <td>POST</td>
+            <td>No body.</td>
+          </tr>
+          <tr>
+            <td><code>/api/admin/kyc/{kycId}/reject?reason=Document%20blurred</code></td>
+            <td>POST</td>
+            <td>Reason is a query parameter.</td>
+          </tr>
+          <tr>
+            <td><code>/api/admin/kyc/user/{userId}/reject?reason=Mismatch</code></td>
+            <td>POST</td>
+            <td>Reason is a query parameter.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="section">
+      <h2>Wallet and Payment Endpoints</h2>
+      <div class="endpoint-list">
+        <div class="endpoint">
+          <h3><span class="method get">GET</span><span class="path">/api/wallet/balance</span></h3>
+          <p>Current wallet balance.</p>
+        </div>
+        <div class="endpoint">
+          <h3><span class="method post">POST</span><span class="path">/api/wallet/transfer</span></h3>
+          <p>Transfer money from current user to another user.</p>
+          <pre><code>{
+  "receiverId": 2,
+  "amount": 250.00,
+  "idempotencyKey": "tx-20260330-001",
+  "description": "Lunch split"
+}</code></pre>
+        </div>
+        <div class="endpoint">
+          <h3><span class="method post">POST</span><span class="path">/api/wallet/withdraw</span></h3>
+          <pre><code>{
+  "amount": 100.00
+}</code></pre>
+        </div>
+        <div class="endpoint">
+          <h3><span class="method get">GET</span><span class="path">/api/wallet/transactions?page=0&amp;size=10</span></h3>
+          <p>Paginated transaction history.</p>
+        </div>
+        <div class="endpoint">
+          <h3><span class="method get">GET</span><span class="path">/api/wallet/ledger?page=0&amp;size=20</span></h3>
+          <p>Ledger entries.</p>
+        </div>
+        <div class="endpoint">
+          <h3><span class="method get">GET</span><span class="path">/api/wallet/statement?from=2026-03-01&amp;to=2026-03-30</span></h3>
+          <p>JSON statement for a date range.</p>
+        </div>
+        <div class="endpoint">
+          <h3><span class="method get">GET</span><span class="path">/api/wallet/statement/download?from=2026-03-01&amp;to=2026-03-30</span></h3>
+          <p>Downloads CSV statement.</p>
+        </div>
+        <div class="endpoint">
+          <h3><span class="method post">POST</span><span class="path">/api/payment/create-order?amount=500</span></h3>
+          <p>Creates a Razorpay order for top-up. Amount is a query parameter, not JSON body.</p>
+          <pre><code>curl -X POST "http://localhost:8080/api/payment/create-order?amount=500" ^
+  -H "Authorization: Bearer &lt;ACCESS_TOKEN&gt;"</code></pre>
+        </div>
+        <div class="endpoint">
+          <h3><span class="method post">POST</span><span class="path">/api/payment/verify</span></h3>
+          <p>Verify Razorpay payment and credit wallet.</p>
+          <pre><code>{
+  "razorpayOrderId": "order_xxx",
+  "razorpayPaymentId": "pay_xxx",
+  "razorpaySignature": "signature_from_checkout"
+}</code></pre>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Reward Endpoints</h2>
+      <div class="endpoint-list">
+        <div class="endpoint">
+          <h3><span class="method get">GET</span><span class="path">/api/rewards/summary</span></h3>
+          <p>Shows current points, tier and next-tier progress.</p>
+        </div>
+        <div class="endpoint">
+          <h3><span class="method get">GET</span><span class="path">/api/rewards/catalog</span></h3>
+          <p>Public catalog for authenticated users.</p>
+        </div>
+        <div class="endpoint">
+          <h3><span class="method post">POST</span><span class="path">/api/rewards/redeem</span></h3>
+          <pre><code>{
+  "rewardId": 1
+}</code></pre>
+        </div>
+        <div class="endpoint">
+          <h3><span class="method post">POST</span><span class="path">/api/rewards/redeem-points?points=200</span></h3>
+          <p>Converts points to wallet cash. Query parameter, no JSON body.</p>
+        </div>
+        <div class="endpoint">
+          <h3><span class="method post">POST</span><span class="path">/api/rewards/convert-to-cash?points=200</span></h3>
+          <p>Alias for redeem-points.</p>
+        </div>
+        <div class="endpoint">
+          <h3><span class="method get">GET</span><span class="path">/api/rewards/transactions</span></h3>
+          <p>Reward transaction history.</p>
+        </div>
+        <div class="endpoint">
+          <h3><span class="method post">POST</span><span class="path">/api/rewards/catalog/add</span></h3>
+          <p>Admin-only catalog creation.</p>
+          <pre><code>{
+  "name": "Cashback 500",
+  "description": "Instant wallet cashback",
+  "pointsRequired": 500,
+  "type": "CASHBACK",
+  "stock": 100,
+  "tierRequired": "SILVER",
+  "cashbackAmount": 500.00
+}</code></pre>
+        </div>
+      </div>
+    </section>
+
+    <section class="section">
+      <h2>Gateway Fallback Endpoints</h2>
+      <p>These are diagnostic endpoints on the API gateway. They return 503-style fallback payloads when circuit breakers are triggered.</p>
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Route</th>
+            <th>Purpose</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td><code>/fallback/auth</code></td><td>Auth-service fallback</td></tr>
+          <tr><td><code>/fallback/user</code></td><td>User-service fallback</td></tr>
+          <tr><td><code>/fallback/wallet</code></td><td>Wallet-service fallback</td></tr>
+          <tr><td><code>/fallback/rewards</code></td><td>Rewards-service fallback</td></tr>
+          <tr><td><code>/fallback/admin</code></td><td>Admin fallback</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="section">
+      <h2>Internal Endpoints</h2>
+      <p class="warn">These are not meant for frontend/Postman usage through the gateway. They are service-to-service routes.</p>
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Service</th>
+            <th>Route</th>
+            <th>Used For</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>auth-service</td><td><code>PUT /api/auth/internal/update-profile</code></td><td>User-service sync after profile update.</td></tr>
+          <tr><td>user-service</td><td><code>POST /api/users/internal/create</code></td><td>Create user profile after auth signup/bootstrap.</td></tr>
+          <tr><td>user-service</td><td><code>GET /api/users/internal/users/{id}</code></td><td>Internal profile lookup.</td></tr>
+          <tr><td>wallet-service</td><td><code>POST /api/wallet/internal/create?userId=...</code></td><td>Create wallet for new user.</td></tr>
+          <tr><td>wallet-service</td><td><code>POST /api/wallet/internal/credit?userId=...&amp;amount=...&amp;source=CASHBACK</code></td><td>Credit wallet from rewards/internal flows.</td></tr>
+          <tr><td>rewards-service</td><td><code>POST /api/rewards/internal/create-account?userId=...</code></td><td>Create reward account for a new user.</td></tr>
+          <tr><td>rewards-service</td><td><code>POST /api/rewards/internal/earn?userId=...&amp;amount=...</code></td><td>Earn points from top-up.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section class="section">
+      <h2>Suggested Test Order</h2>
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Step</th>
+            <th>Call</th>
+            <th>Expected Result</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>1</td><td><code>POST /api/auth/login</code> with bootstrap admin</td><td>Receive admin access token.</td></tr>
+          <tr><td>2</td><td><code>POST /api/auth/signup</code></td><td>Create a normal test user.</td></tr>
+          <tr><td>3</td><td><code>POST /api/auth/login</code> with normal user</td><td>Receive user token.</td></tr>
+          <tr><td>4</td><td><code>GET /api/users/profile</code></td><td>Profile is returned.</td></tr>
+          <tr><td>5</td><td><code>POST /api/payment/create-order</code> then <code>/api/payment/verify</code></td><td>Wallet gets funded.</td></tr>
+          <tr><td>6</td><td><code>GET /api/wallet/balance</code></td><td>Balance reflects top-up.</td></tr>
+          <tr><td>7</td><td><code>GET /api/rewards/summary</code></td><td>Top-up earned points.</td></tr>
+          <tr><td>8</td><td><code>POST /api/wallet/transfer</code></td><td>Funds move to receiver.</td></tr>
+          <tr><td>9</td><td><code>GET /api/admin/users</code></td><td>Admin can inspect users.</td></tr>
+          <tr><td>10</td><td><code>POST /api/kyc/submit</code> then admin KYC approve/reject route</td><td>KYC lifecycle works.</td></tr>
+        </tbody>
+      </table>
+      <p class="ok">If you want, the next useful step is turning this into a prettier in-app docs page or adding copy-to-clipboard curl blocks.</p>
+    </section>
+  </div>
+</body>
+</html>

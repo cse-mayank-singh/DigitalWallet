@@ -1,0 +1,108 @@
+Frontend Implementation & Evaluation Guidelines
+(React.js – Production-Oriented Standards)
+1. Overview
+This document outlines the key areas of focus for frontend implementation and evaluation. It is designed to ensure that the application is built following industry-standard practices, covering architecture, performance, security, user experience, and real-world feature implementation.
+All implementations should aim to be scalable, maintainable, and production-ready.
+2. Architecture & Code Quality
+Follow a feature-based folder structure
+Maintain clean and modular code
+Use meaningful naming conventions
+Ensure separation of concerns
+Write reusable and maintainable components
+3. API Integration & Data Handling
+Implement API integration using Axios / Fetch
+Maintain a centralized API service layer
+Configure Axios with interceptors:
+Attach authentication tokens
+Handle global errors
+Properly handle request and response data
+Manage loading, success, and error states
+4. Authentication & Authorization
+Implement secure login and registration flows
+Handle JWT tokens properly
+Protect routes based on authentication
+Implement role-based UI rendering (if applicable)
+Manage session and token expiry
+5. Error Handling & Resilience
+Implement global error handling mechanisms
+Display user-friendly error messages
+Handle edge cases:
+Empty states
+Loading states
+Failure scenarios
+Provide fallback UI where required
+6. State Management
+Use Redux Toolkit or Context API for global state
+Maintain clear separation between local and global state
+Handle asynchronous operations effectively
+Avoid unnecessary re-renders
+7. Environment & Configuration Management
+Use .env for environment variables
+Manage environment-specific configurations (dev, prod)
+Avoid hardcoding API URLs or sensitive data
+8. Component Design & Reusability
+Build reusable UI components
+Create custom hooks for shared logic
+Follow DRY (Don't Repeat Yourself) principles
+Maintain consistency across components
+9. User Experience (UX) & Interaction Logic
+Implement smooth user interactions
+Provide proper feedback:
+Loading indicators
+Success messages
+Error notifications
+Ensure intuitive navigation flow
+Implement proper form validation UX
+10. UI Design & Visual Quality
+Maintain consistent design across the application
+Ensure proper spacing, alignment, and typography
+Follow a design system or UI guidelines
+Build visually clean and professional interfaces
+11. Responsiveness & Cross-Browser Compatibility
+Implement mobile-first responsive design
+Ensure compatibility across major browsers
+Test UI on different screen sizes
+12. Performance Optimization
+Implement lazy loading and code splitting
+Optimize re-renders using memoization techniques
+Use efficient API calls
+Optimize bundle size where possible
+13. Real-Time Communication
+Implement WebSocket integration where applicable
+Handle real-time updates efficiently
+Manage connection lifecycle properly
+14. Payment Integration
+Implement complete payment flow (e.g., Razorpay)
+Coordinate frontend with backend for order creation
+Handle payment success and failure scenarios
+Ensure secure payment verification
+15. Testing & Debugging
+Write basic unit tests where applicable
+Demonstrate debugging skills
+Use console/logs effectively for troubleshooting
+16. Documentation & Maintainability
+Write readable and well-structured code
+Add comments where necessary
+Maintain a proper README file
+Ensure ease of understanding for other developers
+17. Feature Completeness & Functional Coverage
+Implement all required features
+Ensure end-to-end functionality works correctly
+Cover edge cases and user scenarios
+18. Code Understanding & Explanation Ability
+Be able to clearly explain implementation
+Demonstrate understanding of used concepts
+Justify design and technical decisions
+19. Communication & Problem-Solving
+Clearly explain approach and logic
+Demonstrate structured thinking during debugging
+Handle follow-up questions effectively
+20. Security Best Practices
+Avoid exposing sensitive data on the frontend
+Handle tokens securely
+Validate inputs properly
+Follow basic security practices (XSS/CSRF awareness)
+21. Advanced Practices (Differentiation)
+Implement custom hooks and reusable logic
+Use debouncing/throttling where applicable
+Apply performance optimization strategies

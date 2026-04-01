@@ -2,49 +2,49 @@ version: '3.8'
 
 services:
   zookeeper:
-    image: confluentinc/cp-zookeeper:7.5.0
+    image: ${ZOOKEEPER_IMAGE:confluentinc/cp-zookeeper:7.5.0}
     container_name: zookeeper
     ports:
-      - "2181:2181"
+      - "${ZOOKEEPER_PORT:2181}:2181"
     environment:
-      ZOOKEEPER_CLIENT_PORT: 2181
-      ZOOKEEPER_TICK_TIME: 2000
+      ZOOKEEPER_CLIENT_PORT: ${ZOOKEEPER_PORT:2181}
+      ZOOKEEPER_TICK_TIME: ${ZOOKEEPER_TICK_TIME:2000}
 
   kafka:
-    image: confluentinc/cp-kafka:7.5.0
+    image: ${KAFKA_IMAGE:confluentinc/cp-kafka:7.5.0}
     container_name: kafka
     ports:
-      - "9092:9092"
-      - "29092:29092"
+      - "${KAFKA_EXTERNAL_PORT:9092}:9092"
+      - "${KAFKA_INTERNAL_PORT:29092}:29092"
     depends_on:
       - zookeeper
     environment:
-      KAFKA_BROKER_ID: 1
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_BROKER_ID: ${KAFKA_BROKER_ID:1}
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:${ZOOKEEPER_PORT:2181}
       KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
-      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29092,PLAINTEXT_HOST://0.0.0.0:9092
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:${KAFKA_INTERNAL_PORT:29092},PLAINTEXT_HOST://0.0.0.0:${KAFKA_EXTERNAL_PORT:9092}
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:${KAFKA_INTERNAL_PORT:29092},PLAINTEXT_HOST://${KAFKA_ADVERTISED_HOST:localhost}:${KAFKA_EXTERNAL_PORT:9092}
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: ${KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR:1}
   zipkin:
-    image: openzipkin/zipkin:latest
+    image: ${ZIPKIN_IMAGE:openzipkin/zipkin:latest}
     container_name: zipkin
     ports:
-      - "9411:9411"
+      - "${ZIPKIN_PORT:9411}:9411"
     restart: unless-stopped
 
   redis:
-    image: redis:7
+    image: ${REDIS_IMAGE:redis:7}
     container_name: redis
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT:6379}:6379"
     restart: unless-stopped
 
   prometheus:
-    image: prom/prometheus:v3.5.0
+    image: ${PROMETHEUS_IMAGE:prom/prometheus:v3.5.0}
     container_name: prometheus
     ports:
-      - "9090:9090"
+      - "${PROMETHEUS_PORT:9090}:9090"
     volumes:
       - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
     extra_hosts:
@@ -52,13 +52,13 @@ services:
     restart: unless-stopped
 
   grafana:
-    image: grafana/grafana:12.1.1
+    image: ${GRAFANA_IMAGE:grafana/grafana:12.1.1}
     container_name: grafana
     ports:
-      - "3000:3000"
+      - "${GRAFANA_PORT:3000}:3000"
     environment:
-      GF_SECURITY_ADMIN_USER: admin
-      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:admin}
     volumes:
       - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
       - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
@@ -67,25 +67,25 @@ services:
     restart: unless-stopped
 
   sonarqube-db:
-    image: postgres:16
+    image: ${SONARQUBE_DB_IMAGE:postgres:16}
     container_name: sonarqube-db
     environment:
-      POSTGRES_USER: sonar
-      POSTGRES_PASSWORD: sonar
-      POSTGRES_DB: sonarqube
+      POSTGRES_USER: ${SONARQUBE_DB_USER:sonar}
+      POSTGRES_PASSWORD: ${SONARQUBE_DB_PASSWORD:sonar}
+      POSTGRES_DB: ${SONARQUBE_DB_NAME:sonarqube}
     volumes:
       - sonarqube_db_data:/var/lib/postgresql/data
     restart: unless-stopped
 
   sonarqube:
-    image: sonarqube:community
+    image: ${SONARQUBE_IMAGE:sonarqube:community}
     container_name: sonarqube
     ports:
-      - "9000:9000"
+      - "${SONARQUBE_PORT:9000}:9000"
     environment:
-      SONAR_JDBC_URL: jdbc:postgresql://sonarqube-db:5432/sonarqube
-      SONAR_JDBC_USERNAME: sonar
-      SONAR_JDBC_PASSWORD: sonar
+      SONAR_JDBC_URL: jdbc:postgresql://sonarqube-db:5432/${SONARQUBE_DB_NAME:sonarqube}
+      SONAR_JDBC_USERNAME: ${SONARQUBE_DB_USER:sonar}
+      SONAR_JDBC_PASSWORD: ${SONARQUBE_DB_PASSWORD:sonar}
     volumes:
       - sonarqube_data:/opt/sonarqube/data
       - sonarqube_extensions:/opt/sonarqube/extensions
