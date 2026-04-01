@@ -8,6 +8,7 @@ import com.loyaltyService.auth_service.model.RefreshToken;
 import com.loyaltyService.auth_service.model.User;
 import com.loyaltyService.auth_service.repository.UserRepository;
 import com.loyaltyService.auth_service.security.JwtTokenProvider;
+import com.loyaltyService.auth_service.service.impl.AuthServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -55,7 +56,7 @@ class AuthServiceTest {
     private AuthenticationManager authenticationManager;
 
     @InjectMocks
-    private AuthService authService;
+    private AuthServiceImpl authService;
 
     @BeforeEach
     void clearResetTokens() {

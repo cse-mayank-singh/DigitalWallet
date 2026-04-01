@@ -5,8 +5,11 @@ import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 
-@FeignClient(name = "user-service", fallback = UserServiceClientFallback.class)
-public interface UserServiceClient {
+@FeignClient(
+        name = "user-service",
+        contextId = "userServiceClient",
+        fallback = UserServiceClientFallback.class
+)public interface UserServiceClient {
     @PostMapping("/api/users/internal/create")
     void createUser(@RequestBody CreateUserRequest request);
 

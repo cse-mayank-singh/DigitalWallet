@@ -1,5 +1,6 @@
 package com.loyaltyService.auth_service.service;
 
+import com.loyaltyService.auth_service.service.impl.EmailServiceImpl;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -20,7 +21,7 @@ class EmailServiceTest {
     private JavaMailSender mailSender;
 
     @InjectMocks
-    private EmailService emailService;
+    private EmailServiceImpl emailService;
 
     @Test
     void sendOtpBuildsAndSendsMailMessage() {

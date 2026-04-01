@@ -1,13 +1,12 @@
-server:
-  port: 8084
-
 spring:
+  config:
+    import: optional:file:.env[.properties],optional:file:../.env[.properties]
   application:
     name: auth-service
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/auth_db}
+    url: ${AUTH_SERVICE_DB_URL:jdbc:postgresql://localhost:5432/auth_db}
     username: ${SPRING_DATASOURCE_USERNAME:postgres}
-    password: ${SPRING_DATASOURCE_PASSWORD:root}
+    password: ${SPRING_DATASOURCE_PASSWORD}
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
@@ -20,19 +19,20 @@ spring:
         jdbc:
           time_zone: UTC
   mail:
-    host: smtp.gmail.com
-    port: 587
-    username: ${SPRING_MAIL_USERNAME:shivamkumar1352002@gmail.com}
-    password: ${SPRING_MAIL_PASSWORD:mgyy abat ssya xrhi}
+    host: ${SPRING_MAIL_HOST:smtp.gmail.com}
+    port: ${SPRING_MAIL_PORT:587}
+    username: ${SPRING_MAIL_USERNAME}
+    password: ${SPRING_MAIL_PASSWORD}
     properties:
       mail:
         smtp:
           auth: true
           starttls:
             enable: true
-  redis:
-    host: localhost
-    port: 6379
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
 
 eureka:
   client:
@@ -45,17 +45,26 @@ eureka:
     instance-id: ${spring.application.name}:${server.port}
 
 jwt:
-  secret: ${JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
-  access-token-expiration: 1800000
-  refresh-token-expiration: 604800000
+  secret: ${JWT_SECRET}
+  access-token-expiration: ${JWT_ACCESS_TOKEN_EXPIRATION:1800000}
+  refresh-token-expiration: ${JWT_REFRESH_TOKEN_EXPIRATION:604800000}
+
+app:
+  bootstrap:
+    admin:
+      enabled: ${APP_BOOTSTRAP_ADMIN_ENABLED:true}
+      full-name: ${APP_BOOTSTRAP_ADMIN_FULL_NAME:System Admin}
+      email: ${APP_BOOTSTRAP_ADMIN_EMAIL:admin@digitalwallet.local}
+      phone: ${APP_BOOTSTRAP_ADMIN_PHONE:9999999999}
+      password: ${APP_BOOTSTRAP_ADMIN_PASSWORD}
 
 otp:
-  expiry-minutes: 5
-  length: 6
-  max-attempts: 5
+  expiry-minutes: ${OTP_EXPIRY_MINUTES:5}
+  length: ${OTP_LENGTH:6}
+  max-attempts: ${OTP_MAX_ATTEMPTS:5}
   rate-limit:
-    capacity: 3
-    window-minutes: 10
+    capacity: ${OTP_RATE_LIMIT_CAPACITY:3}
+    window-minutes: ${OTP_RATE_LIMIT_WINDOW_MINUTES:10}
 
 springdoc:
   api-docs:
@@ -65,12 +74,12 @@ springdoc:
 
 management:
   tracing:
-    enabled: ${MANAGEMENT_TRACING_ENABLED:true}
     sampling:
       probability: ${MANAGEMENT_TRACING_SAMPLING_PROBABILITY:1.0}
     export:
       zipkin:
         endpoint: ${MANAGEMENT_TRACING_EXPORT_ZIPKIN_ENDPOINT:${ZIPKIN_ENDPOINT:http://localhost:9411/api/v2/spans}}
+      enabled: ${MANAGEMENT_TRACING_ENABLED:true}
   endpoints:
     web:
       exposure:
@@ -92,3 +101,5 @@ feign:
       default:
         connectTimeout: 5000
         readTimeout: 5000
+server:
+  port: ${AUTH_SERVICE_PORT:8084}

@@ -2,6 +2,8 @@ package com.loyaltyService.auth_service.service;
 
 import com.loyaltyService.auth_service.exception.AuthException;
 import com.loyaltyService.auth_service.model.OtpStore;
+import com.loyaltyService.auth_service.service.impl.OtpServiceImpl;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -36,7 +38,7 @@ class OtpServiceTest {
 
     @BeforeEach
     void setUp() {
-        otpService = new OtpService(redisTemplate);
+        otpService = new OtpServiceImpl(redisTemplate);
         ReflectionTestUtils.setField(otpService, "otpExpiryMinutes", 5);
         ReflectionTestUtils.setField(otpService, "otpLength", 6);
         ReflectionTestUtils.setField(otpService, "maxAttempts", 5);

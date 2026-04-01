@@ -4,6 +4,7 @@ import com.loyaltyService.auth_service.exception.AuthException;
 import com.loyaltyService.auth_service.model.RefreshToken;
 import com.loyaltyService.auth_service.model.User;
 import com.loyaltyService.auth_service.repository.RefreshTokenRepository;
+import com.loyaltyService.auth_service.service.impl.RefreshTokenServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -32,7 +33,7 @@ class RefreshTokenServiceTest {
     private RefreshTokenRepository refreshTokenRepository;
 
     @InjectMocks
-    private RefreshTokenService refreshTokenService;
+    private RefreshTokenServiceImpl refreshTokenService;
 
     @BeforeEach
     void setUp() {

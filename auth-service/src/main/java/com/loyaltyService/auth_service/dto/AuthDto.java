@@ -55,7 +55,7 @@ public class AuthDto {
     @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
     public static class PhoneLoginRequest {
         @NotBlank(message = "Phone is required")
-        @Pattern(regexp = "^[0-9]{10,15}$", message = "Phone must be 10-15 digits")
+        @Pattern(regexp = "^[0-9]{10}$", message = "Phone must be 10 digits")
         private String phone;
 
         @NotBlank(message = "Password is required")
