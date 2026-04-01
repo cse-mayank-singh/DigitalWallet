@@ -1,5 +1,6 @@
 package com.loayaltyService.notification_service.service;
 
+import com.loayaltyService.notification_service.service.impl.EmailServiceImpl;
 import jakarta.mail.Session;
 import jakarta.mail.internet.MimeMessage;
 import org.junit.jupiter.api.Test;
@@ -25,7 +26,7 @@ class EmailServiceTest {
     private JavaMailSender mailSender;
 
     @InjectMocks
-    private EmailService emailService;
+    private EmailServiceImpl emailService;
 
     @Test
     void sendBuildsAndSendsSimpleMailMessage() {

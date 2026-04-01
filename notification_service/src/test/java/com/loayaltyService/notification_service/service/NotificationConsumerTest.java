@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.loayaltyService.notification_service.client.UserClient;
 import com.loayaltyService.notification_service.dto.UserDTO;
+import com.loayaltyService.notification_service.service.impl.NotificationConsumerImpl;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -34,7 +35,7 @@ class NotificationConsumerTest {
     private ObjectMapper objectMapper;
 
     @InjectMocks
-    private NotificationConsumer notificationConsumer;
+    private NotificationConsumerImpl notificationConsumer;
 
     @Test
     void kycApprovedEventSendsHtmlEmail() throws Exception {
