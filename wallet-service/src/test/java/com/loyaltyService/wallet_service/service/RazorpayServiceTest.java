@@ -2,6 +2,7 @@ package com.loyaltyService.wallet_service.service;
 
 import com.loyaltyService.wallet_service.entity.Payment;
 import com.loyaltyService.wallet_service.repository.PaymentRepository;
+import com.loyaltyService.wallet_service.service.impl.RazorpayServiceImpl;
 import com.razorpay.Order;
 import com.razorpay.RazorpayException;
 import org.json.JSONObject;
@@ -26,7 +27,7 @@ class RazorpayServiceTest {
     private PaymentRepository paymentRepo;
 
     @InjectMocks
-    private RazorpayService razorpayService;
+    private RazorpayServiceImpl razorpayService;
 
     @Test
     void createOrderWithoutCredentialsThrows() {

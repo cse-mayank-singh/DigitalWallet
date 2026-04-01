@@ -2,6 +2,8 @@ package com.loyaltyService.wallet_service.service;
 
 import com.loyaltyService.wallet_service.entity.LedgerEntry;
 import com.loyaltyService.wallet_service.repository.LedgerEntryRepository;
+import com.loyaltyService.wallet_service.service.impl.LedgerServiceImpl;
+
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -22,7 +24,7 @@ class LedgerServiceTest {
     private LedgerEntryRepository ledgerRepo;
 
     @InjectMocks
-    private LedgerService ledgerService;
+    private LedgerServiceImpl ledgerService;
 
     @Test
     void recordBuildsAndSavesLedgerEntry() {

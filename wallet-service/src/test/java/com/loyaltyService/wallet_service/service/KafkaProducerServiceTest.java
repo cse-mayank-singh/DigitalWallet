@@ -1,5 +1,6 @@
 package com.loyaltyService.wallet_service.service;
 
+import com.loyaltyService.wallet_service.service.impl.KafkaProducerServiceImpl;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -25,7 +26,7 @@ class KafkaProducerServiceTest {
     private KafkaTemplate<String, String> kafkaTemplate;
 
     @InjectMocks
-    private KafkaProducerService kafkaProducerService;
+    private KafkaProducerServiceImpl kafkaProducerService;
 
     @Test
     void sendSerializesPayloadAndDelegatesToTemplate() {

@@ -6,8 +6,14 @@ import com.loyaltyService.wallet_service.entity.LedgerEntry;
 import com.loyaltyService.wallet_service.entity.Transaction;
 import com.loyaltyService.wallet_service.entity.WalletAccount;
 import com.loyaltyService.wallet_service.exception.WalletException;
+import com.loyaltyService.wallet_service.mapper.WalletMapper;
 import com.loyaltyService.wallet_service.repository.TransactionRepository;
 import com.loyaltyService.wallet_service.repository.WalletAccountRepository;
+import com.loyaltyService.wallet_service.service.KafkaProducerService;
+import com.loyaltyService.wallet_service.service.LedgerService;
+import com.loyaltyService.wallet_service.service.impl.WalletCommandServiceImpl;
+import com.loyaltyService.wallet_service.service.impl.WalletQueryServiceImpl;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -42,22 +48,26 @@ class WalletServiceTest {
     @Mock private LedgerService ledgerService;
     @Mock private RewardClient rewardClient;
     @Mock private KafkaProducerService kafkaProducer;
+    @Mock private WalletMapper walletMapper;
 
     @InjectMocks
-    private WalletService walletService;
+    private WalletCommandServiceImpl walletCommandService;
+
+    @InjectMocks
+    private WalletQueryServiceImpl walletQueryService;
 
     @BeforeEach
     void setUp() {
-        ReflectionTestUtils.setField(walletService, "dailyTopupLimit", new BigDecimal("50000"));
-        ReflectionTestUtils.setField(walletService, "dailyTransferLimit", new BigDecimal("25000"));
-        ReflectionTestUtils.setField(walletService, "maxDailyTransfers", 10);
+        ReflectionTestUtils.setField(walletCommandService, "dailyTopupLimit", new BigDecimal("50000"));
+        ReflectionTestUtils.setField(walletCommandService, "dailyTransferLimit", new BigDecimal("25000"));
+        ReflectionTestUtils.setField(walletCommandService, "maxDailyTransfers", 10);
     }
 
     @Test
     void createWalletSavesNewWallet() {
         when(accountRepo.existsByUserId(1L)).thenReturn(false);
 
-        walletService.createWallet(1L);
+        walletCommandService.createWallet(1L);
 
         verify(accountRepo).save(any(WalletAccount.class));
     }
@@ -66,7 +76,7 @@ class WalletServiceTest {
     void createWalletThrowsWhenAlreadyExists() {
         when(accountRepo.existsByUserId(1L)).thenReturn(true);
 
-        WalletException exception = assertThrows(WalletException.class, () -> walletService.createWallet(1L));
+        WalletException exception = assertThrows(WalletException.class, () -> walletCommandService.createWallet(1L));
 
         assertEquals(HttpStatus.CONFLICT, exception.getStatus());
     }
@@ -74,9 +84,15 @@ class WalletServiceTest {
     @Test
     void getBalanceReturnsMappedResponse() {
         WalletAccount account = activeWallet(1L, "100.00");
+        WalletBalanceResponse mapped = WalletBalanceResponse.builder()
+                .userId(1L)
+                .balance(new BigDecimal("100.00"))
+                .status("ACTIVE")
+                .build();
         when(accountRepo.findByUserId(1L)).thenReturn(Optional.of(account));
+        when(walletMapper.toResponse(account, 1L)).thenReturn(mapped);
 
-        WalletBalanceResponse response = walletService.getBalance(1L);
+        WalletBalanceResponse response = walletQueryService.getBalance(1L);
 
         assertEquals(1L, response.getUserId());
         assertEquals(new BigDecimal("100.00"), response.getBalance());
@@ -87,7 +103,7 @@ class WalletServiceTest {
     void topupIgnoresDuplicateIdempotencyKey() {
         when(txnRepo.findByIdempotencyKey("idem")).thenReturn(Optional.of(Transaction.builder().id(1L).build()));
 
-        walletService.topup(1L, new BigDecimal("100"), "idem");
+        walletCommandService.topup(1L, new BigDecimal("100"), "idem");
 
         verify(ledgerService, never()).record(any(), any(), any(), any(), any());
     }
@@ -100,7 +116,7 @@ class WalletServiceTest {
                 .thenReturn(new BigDecimal("49990"));
 
         WalletException exception = assertThrows(WalletException.class,
-                () -> walletService.topup(1L, new BigDecimal("20"), "idem-2"));
+                () -> walletCommandService.topup(1L, new BigDecimal("20"), "idem-2"));
 
         assertEquals(HttpStatus.BAD_REQUEST, exception.getStatus());
     }
@@ -113,19 +129,18 @@ class WalletServiceTest {
         when(txnRepo.sumTodayTopups(eq(1L), eq(Transaction.TxnType.TOPUP), eq(Transaction.TxnStatus.SUCCESS), any(), any()))
                 .thenReturn(BigDecimal.ZERO);
 
-        walletService.topup(1L, new BigDecimal("50.00"), "idem");
+        walletCommandService.topup(1L, new BigDecimal("50.00"), "idem");
 
         assertEquals(new BigDecimal("150.00"), account.getBalance());
         verify(ledgerService).record(eq(1L), eq(new BigDecimal("50.00")), eq(LedgerEntry.EntryType.CREDIT), org.mockito.ArgumentMatchers.startsWith("TOPUP_"), eq("Wallet top-up"));
         verify(accountRepo).save(account);
-        verify(rewardClient).earnPoints(1L, new BigDecimal("50.00"));
         verify(kafkaProducer).send(eq("wallet-events"), any(Map.class));
     }
 
     @Test
     void transferThrowsWhenSenderEqualsReceiver() {
         WalletException exception = assertThrows(WalletException.class,
-                () -> walletService.transfer(1L, 1L, new BigDecimal("10"), null, "desc"));
+                () -> walletCommandService.transfer(1L, 1L, new BigDecimal("10"), null, "desc"));
 
         assertEquals(HttpStatus.BAD_REQUEST, exception.getStatus());
     }
@@ -134,7 +149,7 @@ class WalletServiceTest {
     void transferIgnoresDuplicateIdempotencyKey() {
         when(txnRepo.findByIdempotencyKey("idem")).thenReturn(Optional.of(Transaction.builder().id(1L).build()));
 
-        walletService.transfer(1L, 2L, new BigDecimal("10"), "idem", "desc");
+        walletCommandService.transfer(1L, 2L, new BigDecimal("10"), "idem", "desc");
 
         verify(accountRepo, never()).save(any(WalletAccount.class));
     }
@@ -148,7 +163,7 @@ class WalletServiceTest {
         when(accountRepo.findByUserId(2L)).thenReturn(Optional.of(receiver));
 
         WalletException exception = assertThrows(WalletException.class,
-                () -> walletService.transfer(1L, 2L, new BigDecimal("20"), "idem", "desc"));
+                () -> walletCommandService.transfer(1L, 2L, new BigDecimal("20"), "idem", "desc"));
 
         assertEquals(HttpStatus.BAD_REQUEST, exception.getStatus());
     }
@@ -164,7 +179,7 @@ class WalletServiceTest {
                 .thenReturn(new BigDecimal("24990"));
 
         WalletException exception = assertThrows(WalletException.class,
-                () -> walletService.transfer(1L, 2L, new BigDecimal("20"), "idem", "desc"));
+                () -> walletCommandService.transfer(1L, 2L, new BigDecimal("20"), "idem", "desc"));
 
         assertEquals(HttpStatus.BAD_REQUEST, exception.getStatus());
     }
@@ -182,7 +197,7 @@ class WalletServiceTest {
                 .thenReturn(10L);
 
         WalletException exception = assertThrows(WalletException.class,
-                () -> walletService.transfer(1L, 2L, new BigDecimal("20"), "idem", "desc"));
+                () -> walletCommandService.transfer(1L, 2L, new BigDecimal("20"), "idem", "desc"));
 
         assertEquals(HttpStatus.BAD_REQUEST, exception.getStatus());
     }
@@ -199,7 +214,7 @@ class WalletServiceTest {
         when(txnRepo.countTodayTransfers(eq(1L), eq(Transaction.TxnType.TRANSFER), eq(Transaction.TxnStatus.SUCCESS), any(), any()))
                 .thenReturn(0L);
 
-        walletService.transfer(1L, 2L, new BigDecimal("25.00"), "idem", "gift");
+        walletCommandService.transfer(1L, 2L, new BigDecimal("25.00"), "idem", "gift");
 
         assertEquals(new BigDecimal("75.00"), sender.getBalance());
         assertEquals(new BigDecimal("65.00"), receiver.getBalance());
@@ -215,7 +230,7 @@ class WalletServiceTest {
         when(accountRepo.findByUserId(1L)).thenReturn(Optional.of(account));
 
         WalletException exception = assertThrows(WalletException.class,
-                () -> walletService.withdraw(1L, new BigDecimal("20")));
+                () -> walletCommandService.withdraw(1L, new BigDecimal("20")));
 
         assertEquals(HttpStatus.BAD_REQUEST, exception.getStatus());
     }
@@ -225,7 +240,7 @@ class WalletServiceTest {
         WalletAccount account = activeWallet(1L, "100.00");
         when(accountRepo.findByUserId(1L)).thenReturn(Optional.of(account));
 
-        walletService.withdraw(1L, new BigDecimal("25.00"));
+        walletCommandService.withdraw(1L, new BigDecimal("25.00"));
 
         assertEquals(new BigDecimal("75.00"), account.getBalance());
         verify(ledgerService).record(eq(1L), eq(new BigDecimal("25.00")), eq(LedgerEntry.EntryType.DEBIT), org.mockito.ArgumentMatchers.startsWith("WITHDRAW_"), eq("Wallet withdrawal"));
@@ -238,7 +253,7 @@ class WalletServiceTest {
         WalletAccount account = activeWallet(1L, "100.00");
         when(accountRepo.findByUserId(1L)).thenReturn(Optional.of(account));
 
-        walletService.creditInternal(1L, new BigDecimal("10.00"));
+        walletCommandService.creditInternal(1L, new BigDecimal("10.00"));
 
         assertEquals(new BigDecimal("110.00"), account.getBalance());
         ArgumentCaptor<Transaction> captor = ArgumentCaptor.forClass(Transaction.class);
@@ -251,7 +266,7 @@ class WalletServiceTest {
         WalletAccount account = activeWallet(1L, "100.00");
         when(accountRepo.findByUserId(1L)).thenReturn(Optional.of(account));
 
-        walletService.creditInternal(1L, new BigDecimal("10.00"), "REDEEM");
+        walletCommandService.creditInternal(1L, new BigDecimal("10.00"), "REDEEM");
 
         ArgumentCaptor<Transaction> captor = ArgumentCaptor.forClass(Transaction.class);
         verify(txnRepo).save(captor.capture());
@@ -263,7 +278,7 @@ class WalletServiceTest {
     void updateStatusDelegatesToRepository() {
         when(accountRepo.findByUserId(1L)).thenReturn(Optional.of(activeWallet(1L, "0.00")));
 
-        walletService.updateStatus(1L, WalletAccount.WalletStatus.BLOCKED);
+        walletCommandService.updateStatus(1L, WalletAccount.WalletStatus.BLOCKED);
 
         verify(accountRepo).updateStatus(1L, WalletAccount.WalletStatus.BLOCKED);
     }
@@ -273,7 +288,7 @@ class WalletServiceTest {
         when(txnRepo.findBySenderIdOrReceiverIdOrderByCreatedAtDesc(1L, 1L, PageRequest.of(0, 10)))
                 .thenReturn(new PageImpl<>(List.of(Transaction.builder().id(1L).build())));
 
-        var page = walletService.getTransactions(1L, PageRequest.of(0, 10));
+        var page = walletQueryService.getTransactions(1L, PageRequest.of(0, 10));
 
         assertEquals(1, page.getTotalElements());
     }
@@ -284,7 +299,7 @@ class WalletServiceTest {
         LocalDateTime to = LocalDateTime.now();
         when(txnRepo.findStatement(1L, from, to)).thenReturn(List.of(Transaction.builder().id(1L).build()));
 
-        var statement = walletService.getStatement(1L, from, to);
+        var statement = walletQueryService.getStatement(1L, from, to);
 
         assertEquals(1, statement.size());
     }
@@ -293,7 +308,7 @@ class WalletServiceTest {
     void getBalanceThrowsWhenWalletMissing() {
         when(accountRepo.findByUserId(99L)).thenReturn(Optional.empty());
 
-        WalletException exception = assertThrows(WalletException.class, () -> walletService.getBalance(99L));
+        WalletException exception = assertThrows(WalletException.class, () -> walletQueryService.getBalance(99L));
 
         assertEquals(HttpStatus.NOT_FOUND, exception.getStatus());
     }
@@ -305,7 +320,7 @@ class WalletServiceTest {
         when(accountRepo.findByUserId(1L)).thenReturn(Optional.of(account));
 
         WalletException exception = assertThrows(WalletException.class,
-                () -> walletService.topup(1L, new BigDecimal("10"), "idem"));
+                () -> walletCommandService.topup(1L, new BigDecimal("10"), "idem"));
 
         assertEquals(HttpStatus.FORBIDDEN, exception.getStatus());
     }

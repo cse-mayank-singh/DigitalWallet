@@ -1,13 +1,12 @@
-server:
-  port: 8083
-
 spring:
+  config:
+    import: optional:file:.env[.properties],optional:file:../.env[.properties]
   application:
     name: wallet-service
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/wallet_db}
+    url: ${WALLET_SERVICE_DB_URL:jdbc:postgresql://localhost:5432/wallet_db}
     username: ${SPRING_DATASOURCE_USERNAME:postgres}
-    password: ${SPRING_DATASOURCE_PASSWORD:root}
+    password: ${SPRING_DATASOURCE_PASSWORD}
     driver-class-name: org.postgresql.Driver
   jpa:
     hibernate:
@@ -19,13 +18,20 @@ spring:
         jdbc:
           time_zone: UTC
   kafka:
-    bootstrap-servers: localhost:9092
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
     consumer:
-      group-id: loyalty-group
+      group-id: wallet-service-saga-group
       auto-offset-reset: earliest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
     producer:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.apache.kafka.common.serialization.StringSerializer
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      timeout: 2000ms
 
 eureka:
   client:
@@ -38,12 +44,12 @@ eureka:
     instance-id: ${spring.application.name}:${server.port}
 
 jwt:
-  secret: ${JWT_SECRET:404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970}
+  secret: ${JWT_SECRET}
 
 wallet:
-  daily-topup-limit: 50000
-  daily-transfer-limit: 25000
-  max-daily-transfers: 10
+  daily-topup-limit: ${WALLET_DAILY_TOPUP_LIMIT:50000}
+  daily-transfer-limit: ${WALLET_DAILY_TRANSFER_LIMIT:25000}
+  max-daily-transfers: ${WALLET_MAX_DAILY_TRANSFERS:10}
 
 springdoc:
   api-docs:
@@ -53,12 +59,12 @@ springdoc:
 
 management:
   tracing:
-    enabled: ${MANAGEMENT_TRACING_ENABLED:true}
     sampling:
       probability: ${MANAGEMENT_TRACING_SAMPLING_PROBABILITY:1.0}
     export:
       zipkin:
         endpoint: ${MANAGEMENT_TRACING_EXPORT_ZIPKIN_ENDPOINT:${ZIPKIN_ENDPOINT:http://localhost:9411/api/v2/spans}}
+      enabled: ${MANAGEMENT_TRACING_ENABLED:true}
   endpoints:
     web:
       exposure:
@@ -73,5 +79,7 @@ logging:
     org.springframework.transaction: INFO
 
 razorpay:
-  key: rzp_test_SUZOuIv4WCfba7
-  secret: BUKskE10ipCanhRnZUFi1IN9
+  key: ${RAZORPAY_KEY}
+  secret: ${RAZORPAY_SECRET}
+server:
+  port: ${WALLET_SERVICE_PORT:8083}

@@ -4,8 +4,9 @@ import com.loyaltyService.wallet_service.dto.*;
 import com.loyaltyService.wallet_service.entity.LedgerEntry;
 import com.loyaltyService.wallet_service.entity.Transaction;
 import com.loyaltyService.wallet_service.repository.LedgerEntryRepository;
-import com.loyaltyService.wallet_service.service.KafkaProducerService;
-import com.loyaltyService.wallet_service.service.WalletService;
+import com.loyaltyService.wallet_service.service.WalletCommandService;
+import com.loyaltyService.wallet_service.service.WalletQueryService;
+
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -24,7 +25,10 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
-
+/**
+ * CQRS Controller — GET endpoints use WalletQueryService (Redis cached),
+ * write endpoints use WalletCommandService (cache-evicting).
+ */
 @Slf4j
 @RestController
 @RequestMapping("api/wallet")
@@ -32,7 +36,10 @@ import java.util.List;
 @Tag(name = "Wallet", description = "Wallet balance, top-up, transfer, ledger")
 public class WalletController {
 
-    private final WalletService walletService;
+    // CQRS: Query side (cached reads)
+    private final WalletQueryService walletQueryService;
+    // CQRS: Command side (writes + cache eviction)
+    private final WalletCommandService walletCommandService;
     private final LedgerEntryRepository ledgerRepo;
 
     // ── Balance ───────────────────────────────────────────────────────────────
@@ -40,18 +47,18 @@ public class WalletController {
     @Operation(summary = "Get wallet balance")
     public ResponseEntity<ApiResponse<WalletBalanceResponse>> balance(
             @RequestHeader("X-User-Id") Long userId) {
-        return ResponseEntity.ok(ApiResponse.ok("Balance fetched", walletService.getBalance(userId)));
+        return ResponseEntity.ok(ApiResponse.ok("Balance fetched", walletQueryService.getBalance(userId)));
     }
 
-//    // ── Topup ─────────────────────────────────────────────────────────────────
-//    @PostMapping("/internal/topup")
-//    @Operation(summary = "Top up wallet")
-//    public ResponseEntity<ApiResponse<Void>> topup(
-//            @RequestHeader("X-User-Id") Long userId,
-//            @Valid @RequestBody TopupRequest req) {
-//        walletService.topup(userId, req.getAmount(), req.getIdempotencyKey());
-//        return ResponseEntity.ok(ApiResponse.ok("Top-up successful"));
-//    }
+    // // ── Topup ─────────────────────────────────────────────────────────────────
+    // @PostMapping("/internal/topup")
+    // @Operation(summary = "Top up wallet")
+    // public ResponseEntity<ApiResponse<Void>> topup(
+    // @RequestHeader("X-User-Id") Long userId,
+    // @Valid @RequestBody TopupRequest req) {
+    // walletService.topup(userId, req.getAmount(), req.getIdempotencyKey());
+    // return ResponseEntity.ok(ApiResponse.ok("Top-up successful"));
+    // }
 
     // ── Transfer ──────────────────────────────────────────────────────────────
     @PostMapping("/transfer")
@@ -59,7 +66,7 @@ public class WalletController {
     public ResponseEntity<ApiResponse<Void>> transfer(
             @RequestHeader("X-User-Id") Long senderId,
             @Valid @RequestBody TransferRequest req) {
-        walletService.transfer(senderId, req.getReceiverId(), req.getAmount(),
+        walletCommandService.transfer(senderId, req.getReceiverId(), req.getAmount(),
                 req.getIdempotencyKey(), req.getDescription());
         return ResponseEntity.ok(ApiResponse.ok("Transfer successful"));
     }
@@ -70,7 +77,7 @@ public class WalletController {
     public ResponseEntity<ApiResponse<Void>> withdraw(
             @RequestHeader("X-User-Id") Long userId,
             @Valid @RequestBody WithdrawRequest req) {
-        walletService.withdraw(userId, req.getAmount());
+        walletCommandService.withdraw(userId, req.getAmount());
         return ResponseEntity.ok(ApiResponse.ok("Withdrawal successful"));
     }
 
@@ -79,9 +86,9 @@ public class WalletController {
     @Operation(summary = "Paginated transaction history")
     public ResponseEntity<Page<Transaction>> transactions(
             @RequestHeader("X-User-Id") Long userId,
-            @RequestParam(defaultValue = "0")  int page,
+            @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
-        return ResponseEntity.ok(walletService.getTransactions(userId,
+        return ResponseEntity.ok(walletQueryService.getTransactions(userId,
                 PageRequest.of(page, size, Sort.by("createdAt").descending())));
     }
 
@@ -90,7 +97,7 @@ public class WalletController {
     @Operation(summary = "Paginated ledger entries")
     public ResponseEntity<Page<LedgerEntry>> ledger(
             @RequestHeader("X-User-Id") Long userId,
-            @RequestParam(defaultValue = "0")  int page,
+            @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
         return ResponseEntity.ok(
                 ledgerRepo.findByUserIdOrderByCreatedAtDesc(userId, PageRequest.of(page, size)));
@@ -104,8 +111,8 @@ public class WalletController {
             @RequestParam String from,
             @RequestParam String to) {
         LocalDateTime fromDt = LocalDate.parse(from).atStartOfDay();
-        LocalDateTime toDt   = LocalDate.parse(to).atTime(23, 59, 59);
-        return ResponseEntity.ok(walletService.getStatement(userId, fromDt, toDt));
+        LocalDateTime toDt = LocalDate.parse(to).atTime(23, 59, 59);
+        return ResponseEntity.ok(walletQueryService.getStatement(userId, fromDt, toDt));
     }
 
     // ── Statement CSV download ────────────────────────────────────────────────
@@ -117,8 +124,8 @@ public class WalletController {
             @RequestParam String to,
             HttpServletResponse response) throws Exception {
         LocalDateTime fromDt = LocalDate.parse(from).atStartOfDay();
-        LocalDateTime toDt   = LocalDate.parse(to).atTime(23, 59, 59);
-        List<Transaction> txns = walletService.getStatement(userId, fromDt, toDt);
+        LocalDateTime toDt = LocalDate.parse(to).atTime(23, 59, 59);
+        List<Transaction> txns = walletQueryService.getStatement(userId, fromDt, toDt);
         response.setContentType("text/csv");
         response.setHeader("Content-Disposition", "attachment; filename=statement_" + userId + ".csv");
         PrintWriter writer = response.getWriter();
@@ -134,21 +141,22 @@ public class WalletController {
     @Operation(summary = "Internal — create wallet for new user")
     public ResponseEntity<ApiResponse<Void>> createWallet(
             @RequestParam Long userId) {
-        walletService.createWallet(userId);
+        walletCommandService.createWallet(userId);
         return ResponseEntity.ok(ApiResponse.ok("Wallet created successfully"));
     }
 
     // ── Internal — credit (cashback or points redemption) ────────────────────
     // FIX: Added optional `source` param ("REDEEM" | "CASHBACK").
-    //      Defaults to "CASHBACK" for backward compatibility.
-    //      This lets the transaction history distinguish point redemptions from topup cashback.
+    // Defaults to "CASHBACK" for backward compatibility.
+    // This lets the transaction history distinguish point redemptions from topup
+    // cashback.
     @PostMapping("/internal/credit")
     @Operation(summary = "Internal cashback/redeem credit (service-to-service only)")
     public ResponseEntity<ApiResponse<Void>> internalCredit(
             @RequestParam Long userId,
             @RequestParam java.math.BigDecimal amount,
             @RequestParam(defaultValue = "CASHBACK") String source) {
-        walletService.creditInternal(userId, amount, source);
+        walletCommandService.creditInternal(userId, amount, source);
         return ResponseEntity.ok(ApiResponse.ok("Credit applied"));
     }
 }
