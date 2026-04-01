@@ -5,6 +5,7 @@ import com.loyaltyService.user_service.dto.AdminUserResponse;
 import com.loyaltyService.user_service.entity.KycDetail;
 import com.loyaltyService.user_service.entity.User;
 import com.loyaltyService.user_service.exception.ResourceNotFoundException;
+import com.loyaltyService.user_service.mapper.AdminUserMapper;
 import com.loyaltyService.user_service.repository.KycRepository;
 import com.loyaltyService.user_service.repository.UserRepository;
 import com.loyaltyService.user_service.service.AdminUserService;
@@ -20,6 +21,7 @@ import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.Locale;
 import java.time.temporal.TemporalAdjusters;
+import org.springframework.cache.annotation.CacheEvict;
 
 @Service
 @RequiredArgsConstructor
@@ -29,6 +31,7 @@ public class AdminUserServiceImpl implements AdminUserService {
 
     private final UserRepository userRepo;
     private final KycRepository kycRepo;
+    private final AdminUserMapper adminUserMapper; 
 
     @Override
     public AdminDashboardResponse getDashboard() {
@@ -90,85 +93,68 @@ public class AdminUserServiceImpl implements AdminUserService {
         } else {
             page = userRepo.findAll(pageable);
         }
-        return page.map(this::toDto);
+        return page.map(adminUserMapper::toDto);
     }
 
     @Override
     public AdminUserResponse getUserById(Long userId) {
         User user = findOrThrow(userId);
-        return toDto(user);
+        return adminUserMapper.toDto(user);
     }
 
     @Override
     public Page<AdminUserResponse> searchUsers(String keyword, Pageable pageable) {
-        return userRepo.searchByKeyword(keyword, pageable).map(this::toDto);
+        return userRepo.searchByKeyword(keyword, pageable).map(adminUserMapper::toDto);
     }
 
     @Override
     public AdminUserResponse findByEmail(String email) {
         User user = userRepo.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("No user with email: " + email));
-        return toDto(user);
+        return adminUserMapper.toDto(user);
     }
 
     @Override
     public AdminUserResponse findByPhone(String phone) {
         User user = userRepo.findByPhone(phone)
                 .orElseThrow(() -> new ResourceNotFoundException("No user with phone: " + phone));
-        return toDto(user);
+        return adminUserMapper.toDto(user);
     }
 
     @Override
     public Page<AdminUserResponse> findByDateRange(LocalDate from, LocalDate to, Pageable pageable) {
         Instant fromInstant = from.atStartOfDay(ZoneOffset.UTC).toInstant();
         Instant toInstant   = to.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant();
-        return userRepo.findByCreatedAtBetween(fromInstant, toInstant, pageable).map(this::toDto);
+        return userRepo.findByCreatedAtBetween(fromInstant, toInstant, pageable).map(adminUserMapper::toDto);
     }
 
     @Override
     public Page<AdminUserResponse> findByKycStatus(String kycStatus, Pageable pageable) {
-        return userRepo.findByLatestKycStatus(kycStatus.toUpperCase(Locale.ROOT), pageable).map(this::toDto);
+        return userRepo.findByLatestKycStatus(kycStatus.toUpperCase(Locale.ROOT), pageable).map(adminUserMapper::toDto);
     }
 
     @Override
     @Transactional
+    @CacheEvict(value = "user-profile", key = "#userId")
     public AdminUserResponse setStatus(Long userId, User.UserStatus newStatus) {
         User user = findOrThrow(userId);
         user.setStatus(newStatus);
         userRepo.save(user);
-        return toDto(user);
+        return adminUserMapper.toDto(user);
     }
 
     @Override
     @Transactional
+    @CacheEvict(value = "user-profile", key = "#userId")
     public AdminUserResponse changeRole(Long userId, User.Role newRole) {
         User user = findOrThrow(userId);
         user.setRole(newRole);
         userRepo.save(user);
-        return toDto(user);
+        return adminUserMapper.toDto(user);
     }
 
     private User findOrThrow(Long id) {
         return userRepo.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found: " + id));
-    }
-
-    private AdminUserResponse toDto(User user) {
-        String kycStatus = kycRepo.findFirstByUserIdOrderBySubmittedAtDesc(user.getId())
-                .map(k -> k.getStatus().name())
-                .orElse(NOT_SUBMITTED);
-
-        return AdminUserResponse.builder()
-                .id(user.getId())
-                .name(user.getName())
-                .email(user.getEmail())
-                .phone(user.getPhone())
-                .status(user.getStatus().name())
-                .role(user.getRole().name())
-                .kycStatus(kycStatus)
-                .createdAt(user.getCreatedAt())
-                .updatedAt(user.getUpdatedAt())
-                .deletedAt(user.getDeletedAt())
-                .build();
     }
 }

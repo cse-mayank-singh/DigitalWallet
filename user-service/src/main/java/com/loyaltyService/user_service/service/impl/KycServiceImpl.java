@@ -7,6 +7,7 @@ import com.loyaltyService.user_service.entity.KycDetail;
 import com.loyaltyService.user_service.entity.User;
 import com.loyaltyService.user_service.exception.DuplicateKycException;
 import com.loyaltyService.user_service.exception.ResourceNotFoundException;
+import com.loyaltyService.user_service.mapper.KycMapper;
 import com.loyaltyService.user_service.repository.AuditLogRepository;
 import com.loyaltyService.user_service.repository.KycRepository;
 import com.loyaltyService.user_service.repository.UserRepository;
@@ -37,6 +38,7 @@ public class KycServiceImpl implements KycService {
     private final AuditLogRepository  auditRepo;
     private final WalletServiceClient walletServiceClient;
     private final KafkaProducerService kafkaProducer;
+    private final KycMapper kycMapper;
 
 
     @Value("${kyc.upload-dir:uploads/kyc}")
@@ -83,7 +85,7 @@ public class KycServiceImpl implements KycService {
                 .build());
 
         log.info("KYC submitted: userId={}, docType={}, kycId={}", userId, docType, saved.getId());
-        return toResponse(saved);
+        return kycMapper.toResponse(saved);
     }
 
     // ── STATUS ────────────────────────────────────────────────────────────────
@@ -91,14 +93,14 @@ public class KycServiceImpl implements KycService {
     public KycStatusResponse getStatus(Long userId) {
         KycDetail kyc = kycRepo.findFirstByUserIdOrderBySubmittedAtDesc(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("No KYC submission found"));
-        return toResponse(kyc);
+        return kycMapper.toResponse(kyc);
     }
 
     // ── PENDING LIST (admin) ──────────────────────────────────────────────────
     @Override
     public Page<KycStatusResponse> getPendingKyc(Pageable pageable) {
         return kycRepo.findByStatusOrderBySubmittedAtDesc(KycDetail.KycStatus.PENDING, pageable)
-                .map(this::toResponse);
+                .map(kycMapper::toResponse);
     }
 
     // ── APPROVE by KYC id (admin) ─────────────────────────────────────────────
@@ -201,7 +203,7 @@ public class KycServiceImpl implements KycService {
 
         // Create reward account with the SAME userId
         log.info("KYC approved: kycId={}, userId={}, by={}", kyc.getId(), userId, adminEmail);
-        return toResponse(saved);
+        return kycMapper.toResponse(saved);
     }
 
     private KycStatusResponse doReject(KycDetail kyc, String reason, String adminEmail) {
@@ -228,7 +230,7 @@ public class KycServiceImpl implements KycService {
         );
 
         kafkaProducer.send("kyc-events", event);
-        return toResponse(saved);
+        return kycMapper.toResponse(saved);
     }
 
     private KycDetail findKyc(Long id) {
@@ -241,19 +243,4 @@ public class KycServiceImpl implements KycService {
                 .orElseThrow(() -> new ResourceNotFoundException("User not found: " + userId));
     }
 
-    private KycStatusResponse toResponse(KycDetail k) {
-        User user = k.getUser();
-        return KycStatusResponse.builder()
-                .kycId(k.getId())
-                .userId(user != null ? user.getId() : null)
-                .userName(user != null ? user.getName() : null)
-                .userEmail(user != null ? user.getEmail() : null)
-                .docType(k.getDocType().name())
-                .docNumber(k.getDocNumber())
-                .status(k.getStatus().name())
-                .rejectionReason(k.getRejectionReason())
-                .submittedAt(k.getSubmittedAt())
-                .updatedAt(k.getUpdatedAt())
-                .build();
-    }
 }

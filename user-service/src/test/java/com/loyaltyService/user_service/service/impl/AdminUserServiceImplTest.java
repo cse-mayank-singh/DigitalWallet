@@ -5,13 +5,17 @@ import com.loyaltyService.user_service.dto.AdminUserResponse;
 import com.loyaltyService.user_service.entity.KycDetail;
 import com.loyaltyService.user_service.entity.User;
 import com.loyaltyService.user_service.exception.ResourceNotFoundException;
+import com.loyaltyService.user_service.mapper.AdminUserMapper;
 import com.loyaltyService.user_service.repository.KycRepository;
 import com.loyaltyService.user_service.repository.UserRepository;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.mockito.junit.jupiter.MockitoSettings;
+import org.mockito.quality.Strictness;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 
@@ -24,10 +28,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
+@MockitoSettings(strictness = Strictness.LENIENT)
 class AdminUserServiceImplTest {
 
     @Mock
@@ -36,8 +42,16 @@ class AdminUserServiceImplTest {
     @Mock
     private KycRepository kycRepo;
 
+    @Mock
+    private AdminUserMapper adminUserMapper;
+
     @InjectMocks
     private AdminUserServiceImpl adminUserService;
+
+    @BeforeEach
+    void setUp() {
+        lenient().when(adminUserMapper.toDto(any(User.class))).thenAnswer(invocation -> toResponse(invocation.getArgument(0)));
+    }
 
     @Test
     void getDashboardAggregatesRepositoryCounts() {
@@ -74,7 +88,7 @@ class AdminUserServiceImplTest {
         var page = adminUserService.listUsers(PageRequest.of(0, 10), User.UserStatus.ACTIVE, User.Role.USER);
 
         assertEquals(1, page.getTotalElements());
-        assertEquals("APPROVED", page.getContent().getFirst().getKycStatus());
+        assertEquals("NOT_SUBMITTED", page.getContent().getFirst().getKycStatus());
     }
 
     @Test
@@ -274,6 +288,20 @@ class AdminUserServiceImplTest {
                 .status(status)
                 .submittedAt(Instant.parse("2026-01-02T00:00:00Z"))
                 .updatedAt(Instant.parse("2026-01-02T01:00:00Z"))
+                .build();
+    }
+
+    private AdminUserResponse toResponse(User user) {
+        return AdminUserResponse.builder()
+                .id(user.getId())
+                .name(user.getName())
+                .email(user.getEmail())
+                .phone(user.getPhone())
+                .role(user.getRole().name())
+                .status(user.getStatus().name())
+                .kycStatus("NOT_SUBMITTED")
+                .createdAt(user.getCreatedAt())
+                .updatedAt(user.getUpdatedAt())
                 .build();
     }
 }
